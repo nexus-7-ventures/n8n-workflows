@@ -1,0 +1,96 @@
+# Microworkers Automation System Dependencies
+# Core automation and browser control
+selenium>=4.15.0
+pyautogui>=0.9.54
+mouse>=0.7.1
+keyboard>=0.13.5
+
+# Human-like behavior simulation
+numpy>=1.24.0
+scipy>=1.10.0
+
+# Image processing and computer vision
+opencv-python>=4.8.0
+Pillow>=10.0.0
+
+# GUI and interface components
+tkinter-tooltip>=2.0.0
+
+# HTTP requests and web scraping
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+
+# Data handling and configuration
+pydantic>=2.4.0
+python-dotenv>=1.0.0
+
+# Async and concurrency
+asyncio-mqtt>=0.16.0
+
+# Logging and monitoring
+loguru>=0.7.0
+
+# Date and time handling
+python-dateutil>=2.8.0
+
+# File and path operations
+pathlib2>=2.3.7
+
+# JSON and data serialization
+orjson>=3.9.0
+
+# Configuration management
+pyyaml>=6.0
+
+# Network and connection handling
+urllib3>=2.0.0
+certifi>=2023.7.22
+
+# Browser automation enhancements
+undetected-chromedriver>=3.5.0
+selenium-stealth>=1.0.6
+
+# Random data generation for human-like behavior
+faker>=19.0.0
+
+# Image capture and screenshot handling
+pygetwindow>=0.0.9
+pyperclip>=1.8.2
+
+# Math and statistics for behavior modeling
+scikit-learn>=1.3.0
+matplotlib>=3.7.0
+
+# Process and system monitoring
+psutil>=5.9.0
+
+# Encryption and security (for credential storage)
+cryptography>=41.0.0
+
+# Development and testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+
+# Code quality and formatting
+black>=23.0.0
+flake8>=6.0.0
+
+# Documentation
+sphinx>=7.0.0
+
+# Optional: Advanced ML for pattern recognition
+# tensorflow>=2.13.0  # Uncomment if using ML features
+# torch>=2.0.0        # Uncomment if using PyTorch features
+
+# Windows-specific dependencies (automatically installed on Windows)
+pywin32>=306; sys_platform == "win32"
+wmi>=1.5.1; sys_platform == "win32"
+
+# Linux-specific dependencies
+python-xlib>=0.33; sys_platform == "linux"
+pynput>=1.7.6; sys_platform == "linux"
+
+# macOS-specific dependencies  
+pyobjc-framework-Quartz>=9.2; sys_platform == "darwin"
+pyobjc-framework-ApplicationServices>=9.2; sys_platform == "darwin"

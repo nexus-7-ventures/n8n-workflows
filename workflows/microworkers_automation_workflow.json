@@ -1,0 +1,375 @@
+{
+  "name": "Microworkers Click+Search Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "mw_scheduler",
+      "name": "Task Scheduler",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        240,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Initialize Microworkers automation session\nconst { MicroworkersAutomation } = require('./microworkers_automation.py');\nconst { config } = require('./microworkers_config.py');\n\n// Get credentials\nconst username = $env.MW_USERNAME;\nconst password = $env.MW_PASSWORD;\n\nif (!username || !password) {\n  throw new Error('Microworkers credentials not configured');\n}\n\n// Initialize automation\nconst automation = new MicroworkersAutomation();\n\n// Start session\nconst loginSuccess = await automation.login(username, password);\n\nif (!loginSuccess) {\n  throw new Error('Failed to login to Microworkers');\n}\n\n// Return session info\nreturn {\n  json: {\n    status: 'logged_in',\n    timestamp: new Date().toISOString(),\n    session_id: automation.session_stats.session_start,\n    automation_instance: automation\n  }\n};"
+      },
+      "id": "mw_init",
+      "name": "Initialize MW Session",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        460,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Human-like delay before starting tasks\nconst { config } = require('./microworkers_config.py');\nconst delayRange = config.TIMING_CONFIG.between_tasks_delay;\nconst randomDelay = Math.floor(Math.random() * (delayRange.max - delayRange.min + 1)) + delayRange.min;\n\n// Log delay\nconsole.log(`Waiting ${randomDelay} seconds before starting tasks...`);\n\n// Return delay info\nreturn {\n  json: {\n    delay_seconds: randomDelay,\n    start_time: new Date().toISOString(),\n    message: 'Human-like delay applied'\n  }\n};"
+      },
+      "id": "mw_delay",
+      "name": "Human-like Delay",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        680,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "amount": "={{$json.delay_seconds}}",
+        "unit": "seconds"
+      },
+      "id": "mw_wait",
+      "name": "Wait",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        900,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Find and filter valid Click + Search tasks\nconst automation = $node['Initialize MW Session'].json.automation_instance;\n\ntry {\n  // Navigate to tasks page\n  const navSuccess = await automation.navigate_to_tasks();\n  \n  if (!navSuccess) {\n    throw new Error('Failed to navigate to tasks page');\n  }\n  \n  // Find valid tasks\n  const validTasks = await automation.find_valid_tasks();\n  \n  if (validTasks.length === 0) {\n    return {\n      json: {\n        status: 'no_tasks',\n        message: 'No valid Click + Search tasks found',\n        timestamp: new Date().toISOString()\n      }\n    };\n  }\n  \n  // Sort by payout (highest first) and limit to 3 tasks per cycle\n  const tasksToExecute = validTasks.slice(0, 3);\n  \n  return {\n    json: {\n      status: 'tasks_found',\n      tasks: tasksToExecute.map(task => ({\n        id: task.task_id,\n        title: task.title,\n        payout: task.payout,\n        description: task.description.substring(0, 200),\n        time_required: task.time_required\n      })),\n      total_found: validTasks.length,\n      selected_count: tasksToExecute.length,\n      timestamp: new Date().toISOString()\n    }\n  };\n  \n} catch (error) {\n  console.error('Task finding error:', error);\n  return {\n    json: {\n      status: 'error',\n      error: error.message,\n      timestamp: new Date().toISOString()\n    }\n  };\n}"
+      },
+      "id": "mw_find_tasks",
+      "name": "Find Valid Tasks",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.status}}",
+              "operation": "equal",
+              "value2": "tasks_found"
+            }
+          ]
+        }
+      },
+      "id": "mw_check_tasks",
+      "name": "Tasks Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Execute each task with human-like behavior\nconst automation = $node['Initialize MW Session'].json.automation_instance;\nconst tasks = $json.tasks;\nconst results = [];\n\nfor (const taskInfo of tasks) {\n  try {\n    console.log(`Executing task: ${taskInfo.title}`);\n    \n    // Create task object from info\n    const task = {\n      task_id: taskInfo.id,\n      title: taskInfo.title,\n      payout: taskInfo.payout,\n      description: taskInfo.description,\n      time_required: taskInfo.time_required\n    };\n    \n    // Execute task\n    const success = await automation.execute_task(task);\n    \n    results.push({\n      task_id: taskInfo.id,\n      title: taskInfo.title,\n      success: success,\n      timestamp: new Date().toISOString()\n    });\n    \n    // Human-like pause between tasks\n    if (tasks.indexOf(taskInfo) < tasks.length - 1) {\n      await automation.random_pause_between_tasks();\n    }\n    \n  } catch (error) {\n    console.error(`Task execution error for ${taskInfo.id}:`, error);\n    results.push({\n      task_id: taskInfo.id,\n      title: taskInfo.title,\n      success: false,\n      error: error.message,\n      timestamp: new Date().toISOString()\n    });\n  }\n}\n\n// Get session stats\nconst sessionStats = automation.get_session_stats();\n\nreturn {\n  json: {\n    status: 'tasks_executed',\n    results: results,\n    session_stats: sessionStats,\n    successful_tasks: results.filter(r => r.success).length,\n    failed_tasks: results.filter(r => !r.success).length,\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "mw_execute_tasks",
+      "name": "Execute Tasks",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1560,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Log when no tasks are found\nconsole.log('No valid Click + Search tasks found in this cycle');\n\nreturn {\n  json: {\n    status: 'no_action',\n    message: 'No tasks to execute',\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "mw_no_tasks",
+      "name": "No Tasks Action",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1560,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Log session results and cleanup\nconst automation = $node['Initialize MW Session'].json.automation_instance;\nconst results = $json;\n\ntry {\n  // Save session log\n  const logData = {\n    session_end: new Date().toISOString(),\n    ...results\n  };\n  \n  // Log to file (implement logging mechanism)\n  console.log('Session completed:', JSON.stringify(logData, null, 2));\n  \n  // Clean up automation resources\n  await automation.cleanup();\n  \n  return {\n    json: {\n      status: 'session_completed',\n      summary: {\n        successful_tasks: results.successful_tasks || 0,\n        failed_tasks: results.failed_tasks || 0,\n        session_duration: results.session_stats?.session_duration_minutes || 0,\n        success_rate: results.session_stats?.success_rate || 0\n      },\n      timestamp: new Date().toISOString()\n    }\n  };\n  \n} catch (error) {\n  console.error('Cleanup error:', error);\n  return {\n    json: {\n      status: 'cleanup_error',\n      error: error.message,\n      timestamp: new Date().toISOString()\n    }\n  };\n}"
+      },
+      "id": "mw_cleanup",
+      "name": "Session Cleanup",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1780,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Human behavior validation and bot detection prevention\nconst { config } = require('./microworkers_config.py');\nconst sessionData = $json;\n\n// Check if behavior appears human-like\nconst validationChecks = {\n  timing_check: true,\n  speed_check: true,\n  pattern_check: true,\n  success_rate_check: true\n};\n\n// Validate timing (should be within human range)\nif (sessionData.session_stats) {\n  const tasksPerHour = sessionData.successful_tasks / (sessionData.session_stats.session_duration_minutes / 60);\n  const maxRate = config.TIMING_CONFIG.tasks_per_hour.max;\n  \n  if (tasksPerHour > maxRate) {\n    validationChecks.timing_check = false;\n    console.warn(`Task rate too high: ${tasksPerHour}/hour (max: ${maxRate})`);\n  }\n}\n\n// Validate success rate (shouldn't be 100% - that's suspicious)\nif (sessionData.session_stats?.success_rate > 95) {\n  validationChecks.success_rate_check = false;\n  console.warn('Success rate suspiciously high');\n}\n\nconst allChecksPass = Object.values(validationChecks).every(check => check === true);\n\nreturn {\n  json: {\n    status: allChecksPass ? 'validation_passed' : 'validation_failed',\n    checks: validationChecks,\n    recommendation: allChecksPass ? 'Behavior appears human-like' : 'Adjust timing and behavior patterns',\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "mw_validate",
+      "name": "Behavior Validation",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        2000,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.status}}",
+              "operation": "equal",
+              "value2": "validation_failed"
+            }
+          ]
+        }
+      },
+      "id": "mw_check_validation",
+      "name": "Validation Failed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        2220,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Implement corrective measures for failed validation\nconst validationData = $json;\n\nconsole.log('Validation failed, implementing corrections:');\nconsole.log(JSON.stringify(validationData.checks, null, 2));\n\n// Increase delays for next session\nconst corrections = {\n  increase_delays: true,\n  reduce_task_rate: true,\n  add_random_errors: true,\n  extend_pause_times: true\n};\n\n// Save corrections to config (implement config update mechanism)\nconsole.log('Corrections to apply:', corrections);\n\nreturn {\n  json: {\n    status: 'corrections_applied',\n    corrections: corrections,\n    message: 'Behavior patterns adjusted for next session',\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "mw_corrections",
+      "name": "Apply Corrections",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        2440,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Final success logging\nconsole.log('Microworkers automation cycle completed successfully');\n\nreturn {\n  json: {\n    status: 'cycle_complete',\n    message: 'Automation cycle finished',\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "mw_success",
+      "name": "Success Complete",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        2440,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Error handling and recovery\nconst errorData = $json;\n\nconsole.error('Workflow error occurred:', errorData);\n\n// Implement error recovery logic\nconst recovery = {\n  restart_browser: true,\n  reset_session: true,\n  increase_delays: true,\n  notify_admin: errorData.error?.includes('login') || errorData.error?.includes('connection')\n};\n\nreturn {\n  json: {\n    status: 'error_handled',\n    error: errorData,\n    recovery_actions: recovery,\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "mw_error_handler",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        440
+      ]
+    }
+  ],
+  "connections": {
+    "Task Scheduler": {
+      "main": [
+        [
+          {
+            "node": "Initialize MW Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Initialize MW Session": {
+      "main": [
+        [
+          {
+            "node": "Human-like Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Human-like Delay": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Find Valid Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Valid Tasks": {
+      "main": [
+        [
+          {
+            "node": "Tasks Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tasks Found?": {
+      "main": [
+        [
+          {
+            "node": "Execute Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Tasks Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Tasks": {
+      "main": [
+        [
+          {
+            "node": "Session Cleanup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Tasks Action": {
+      "main": [
+        [
+          {
+            "node": "Session Cleanup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Session Cleanup": {
+      "main": [
+        [
+          {
+            "node": "Behavior Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Behavior Validation": {
+      "main": [
+        [
+          {
+            "node": "Validation Failed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validation Failed?": {
+      "main": [
+        [
+          {
+            "node": "Apply Corrections",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Success Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "Error Handler"
+  },
+  "staticData": {},
+  "meta": {
+    "instanceId": "microworkers-automation-v1"
+  },
+  "pinData": {},
+  "versionId": "1.0.0",
+  "triggerCount": 1,
+  "tags": [
+    {
+      "id": "microworkers",
+      "name": "Microworkers"
+    },
+    {
+      "id": "automation",
+      "name": "Automation"
+    },
+    {
+      "id": "click-search",
+      "name": "Click+Search"
+    }
+  ]
+}
