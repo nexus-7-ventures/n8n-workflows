@@ -1,0 +1,20 @@
+IMPORTANT: Replace this file with your actual guidelines.txt file!
+
+This is a placeholder file to show you exactly where to put your June 2024 Maps Search Guidelines.
+
+Steps:
+1. Delete this file (guidelines_PLACEHOLDER.txt)
+2. Add your actual guidelines.txt file here
+3. Make sure it's named exactly: guidelines.txt
+4. Run: python setup.py to verify everything is ready
+5. Run: python main.py to start the agent
+
+The guidelines.txt file should contain your complete June 2024 Maps Search Evaluation guidelines with:
+- Relevance levels (Navigational, Excellent, Good, Fair, Poor, Not Relevant)
+- User intent analysis rules
+- Demotion criteria (Distance, Prominence, Data Accuracy)
+- Viewport age handling
+- Closure detection logic
+- Rating thresholds and examples
+
+Without the proper guidelines.txt file, the agent cannot function correctly.
